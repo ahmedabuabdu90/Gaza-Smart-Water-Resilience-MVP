@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gaza Water Resilience - MVP Demo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #1a5f7a;
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .alert-banner {
+            background: #ff6b6b;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            animation: blink 1s infinite;
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.7; }
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1100px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #1a5f7a;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1a5f7a;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            z-index: 1;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            transition: transform 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card h3 {
+            color: #1a5f7a;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #2d3436;
+        }
+
+        .stat-unit {
+            font-size: 1rem;
+            color: #636e72;
+        }
+
+        .positive {
+            color: #00b894;
+        }
+
+        .negative {
+            color: #d63031;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+            color: #636e72;
+            font-size: 0.9rem;
+        }
+
+        .monitoring-point {
+            cursor: pointer;
+        }
+
+        .point-info {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 12px 25px;
+            background: #1a5f7a;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background: #144d63;
+        }
+
+        #simulateLeak {
+            background: #ff6b6b;
+        }
+
+        #simulateLeak:hover {
+            background: #ff5252;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Gaza Smart Water Resilience MVP</h1>
+            <p class="subtitle">
+                A simulation-based MVP demonstrating how a real-time smart water monitoring system would operate in Gaza
+            </p>
+        </header>
+
+        <div class="alert-banner" id="alertBanner">
+            ⚠️ LEAK DETECTED! Abnormal pressure drop at Location: North Gaza Pump Station. Immediate attention required!
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Water Saved (Today)</h3>
+                <div class="stat-value positive">15,400 <span class="stat-unit">Liters</span></div>
+            </div>
+            <div class="stat-card">
+                <h3>Active Monitoring Points</h3>
+                <div class="stat-value">4 <span class="stat-unit">Locations</span></div>
+            </div>
+            <div class="stat-card">
+                <h3>Leaks Detected (Last 24h)</h3>
+                <div class="stat-value">1 <span class="stat-unit">Incident</span></div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg. Response Time</h3>
+                <div class="stat-value">2.3 <span class="stat-unit">Hours</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>System Status & Alerts Log</h2>
+            <div id="alertLog" style="background: #f8f9fa; padding: 15px; border-radius: 5px; height: 150px; overflow-y: auto; font-family: monospace;">
+                <p>10:00 AM - System initialized. All sensors online.</p>
+                <p>10:15 AM - Normal operation: Pressure stable at 3.8-4.2 bar</p>
+                <p>10:30 AM - Flow rates within normal range (85-120 L/s)</p>
+            </div>
+            <div style="margin-top: 15px; display: flex; gap: 10px;">
+                <button onclick="sendSMSAlert()">📱 Simulate SMS Alert to Manager</button>
+                <button onclick="generateReport()">📄 Generate Daily Report</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="card">
+                <h2>Water Network Monitoring Map</h2>
+                <div id="map"></div>
+                <div class="controls">
+                    <button id="simulateLeak">Simulate Leak Detection</button>
+                    <button id="resetLeak">Reset Simulation</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Water Flow & Pressure Analytics</h2>
+                <div class="chart-container">
+                    <canvas id="flowChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Water Conservation Impact</h2>
+            <div class="chart-container">
+                <canvas id="savingsChart"></canvas>
+            </div>
+        </div>
+
+        <footer>
+            <p>This MVP demonstrates the core functionality of the Smart Water Resilience Solution for Gaza. The system enables real-time monitoring, leak detection, and data-driven decision making for water utility managers.</p>
+            <p style="margin-top: 10px;">© 2025 SPARK Gaza System | Proposal for Arab Development Fund</p>
+        </footer>
+    </div>
+
+    <script>
+        // Helper function to get current time
+        function getCurrentTime() {
+            return new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        }
+
+        // Thresholds for rule-based leak detection
+        const PRESSURE_MIN = 2.0;   // bar
+        const FLOW_MAX = 180;       // L/s
+
+        // Initialize the map centered on Gaza
+        const map = L.map('map').setView([31.5, 34.466667], 11);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // Monitoring points data
+        const monitoringPoints = [
+            {id: 1, name: "North Gaza Pump Station", coordinates: [31.55, 34.5], status: "normal", pressure: 4.2, flow: 120, lastUpdate: "10:30 AM"},
+            {id: 2, name: "Gaza City Main Line", coordinates: [31.52, 34.45], status: "normal", pressure: 3.8, flow: 95, lastUpdate: "10:25 AM"},
+            {id: 3, name: "Khan Younis Reservoir", coordinates: [31.35, 34.3], status: "normal", pressure: 4.0, flow: 110, lastUpdate: "10:15 AM"},
+            {id: 4, name: "Rafah Distribution Node", coordinates: [31.3, 34.25], status: "normal", pressure: 3.5, flow: 85, lastUpdate: "10:05 AM"}
+        ];
+
+        // Define custom icons
+        const normalIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+        const leakIcon = L.icon({
+            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+        });
+
+        // Add monitoring points to the map
+        const markers = [];
+        monitoringPoints.forEach(point => {
+            const marker = L.marker(point.coordinates, { icon: normalIcon })
+                .addTo(map)
+                .bindPopup(`
+                    <div class="point-info">
+                        <h3>${point.name}</h3>
+                        <p><strong>Status:</strong> <span id="status-${point.id}">${point.status.toUpperCase()}</span></p>
+                        <p><strong>Pressure:</strong> <span id="pressure-${point.id}">${point.pressure}</span> bar</p>
+                        <p><strong>Flow Rate:</strong> <span id="flow-${point.id}">${point.flow}</span> L/s</p>
+                        <p><strong>Last Update:</strong> ${point.lastUpdate}</p>
+                    </div>
+                `);
+            marker.pointData = point;
+            markers.push(marker);
+        });
+
+        // Initialize charts
+        const flowCtx = document.getElementById('flowChart').getContext('2d');
+        const flowChart = new Chart(flowCtx, {
+            type: 'line',
+            data: {
+                labels: ['6:00 AM', '7:00 AM', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM'],
+                datasets: [
+                    { label: 'Water Flow (L/s)', data: [100, 115, 105, 120, 95, 110], borderColor: '#1a5f7a', backgroundColor: 'rgba(26, 95, 122, 0.1)', fill: true, tension: 0.4 },
+                    { label: 'Pressure (bar)', data: [4.0, 4.1, 3.9, 4.2, 3.5, 3.8], borderColor: '#00b894', backgroundColor: 'rgba(0, 184, 148, 0.1)', fill: true, tension: 0.4 }
+                ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                plugins: { 
+                    title: { 
+                        display: true, 
+                        text: 'Real-time Flow and Pressure Data' 
+                    }
+                }, 
+                scales: { 
+                    y: { 
+                        beginAtZero: false, 
+                        title: { 
+                            display: true, 
+                            text: 'Values' 
+                        } 
+                    } 
+                } 
+            }
+        });
+
+        const savingsCtx = document.getElementById('savingsChart').getContext('2d');
+        const savingsChart = new Chart(savingsCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+                datasets: [
+                    { label: 'Water Saved (Thousand Liters)', data: [45, 52, 60, 70], backgroundColor: 'rgba(26, 95, 122, 0.7)', borderColor: '#1a5f7a', borderWidth: 1 },
+                    { label: 'Non-Revenue Water Reduction (%)', data: [5, 8, 12, 15], backgroundColor: 'rgba(0, 184, 148, 0.7)', borderColor: '#00b894', borderWidth: 1, type: 'line', yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { 
+                    title: { 
+                        display: true, 
+                        text: 'Weekly Water Conservation Impact' 
+                    } 
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true, 
+                        title: { 
+                            display: true, 
+                            text: 'Water Saved (Thousand Liters)' 
+                        } 
+                    },
+                    y1: { 
+                        position: 'right', 
+                        beginAtZero: true, 
+                        max: 20, 
+                        title: { 
+                            display: true, 
+                            text: 'NRW Reduction (%)' 
+                        }, 
+                        grid: { 
+                            drawOnChartArea: false 
+                        } 
+                    }
+                }
+            }
+        });
+
+        // Rule-based leak evaluation
+        function evaluateLeak(point) {
+            return (point.pressure < PRESSURE_MIN && point.flow > FLOW_MAX);
+        }
+
+        function showLeak(index) {
+            const point = monitoringPoints[index];
+            document.getElementById('alertBanner').style.display = 'block';
+            markers[index].setIcon(leakIcon);
+            markers[index].setPopupContent(`
+                <div class="point-info">
+                    <h3>${point.name}</h3>
+                    <p><strong>Status:</strong> <span style="color:red;">LEAK DETECTED</span></p>
+                    <p><strong>Pressure:</strong> ${point.pressure} bar (Below safe limit)</p>
+                    <p><strong>Flow Rate:</strong> ${point.flow} L/s (Above normal range)</p>
+                    <p><strong>Decision:</strong> Rule-based anomaly detection</p>
+                    <p><strong>Last Update:</strong> ${getCurrentTime()}</p>
+                </div>
+            `);
+            markers[index].openPopup();
+            map.setView(point.coordinates, 13);
+            
+            // Add to alert log
+            const log = document.getElementById('alertLog');
+            const time = getCurrentTime();
+            log.innerHTML += `<p>${time} - LEAK DETECTED at ${point.name}. Pressure: ${point.pressure} bar, Flow: ${point.flow} L/s</p>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function triggerLeak(pointIndex) {
+            const point = monitoringPoints[pointIndex];
+            // Simulated abnormal readings
+            point.pressure = 1.2;
+            point.flow = 210;
+            if (evaluateLeak(point)) showLeak(pointIndex);
+
+            // Update flow chart
+            flowChart.data.datasets[0].data[4] = point.flow;
+            flowChart.data.datasets[1].data[4] = point.pressure;
+            flowChart.update();
+
+            // Update stats
+            document.querySelector('.stat-value.positive').textContent = '0 Liters';
+            document.querySelector('.stat-card:nth-child(3) .stat-value').textContent = '1 Incident';
+            document.querySelector('.stat-card:nth-child(4) .stat-value').textContent = '2.3 Hours';
+        }
+
+        // Reset simulation
+        document.getElementById('simulateLeak').addEventListener('click', function() {
+            triggerLeak(0);
+            this.disabled = true;
+            document.getElementById('resetLeak').disabled = false;
+            
+            // Add to alert log
+            const log = document.getElementById('alertLog');
+            const time = getCurrentTime();
+            log.innerHTML += `<p>${time} - Manual leak simulation triggered at North Gaza Pump Station</p>`;
+            log.scrollTop = log.scrollHeight;
+        });
+
+        document.getElementById('resetLeak').addEventListener('click', function() {
+            // Hide alert
+            document.getElementById('alertBanner').style.display = 'none';
+
+            // Reset first point
+            const point = monitoringPoints[0];
+            point.status = "normal";
+            point.pressure = 4.2;
+            point.flow = 120;
+
+            markers[0].setIcon(normalIcon);
+            markers[0].setPopupContent(`
+                <div class="point-info">
+                    <h3>${point.name}</h3>
+                    <p><strong>Status:</strong> NORMAL</p>
+                    <p><strong>Pressure:</strong> ${point.pressure} bar</p>
+                    <p><strong>Flow Rate:</strong> ${point.flow} L/s</p>
+                    <p><strong>Last Update:</strong> ${getCurrentTime()}</p>
+                </div>
+            `);
+
+            // Reset charts
+            flowChart.data.datasets[0].data[4] = 95;
+            flowChart.data.datasets[1].data[4] = 3.5;
+            flowChart.update();
+
+            // Reset stats
+            document.querySelector('.stat-value.positive').textContent = '15,400 Liters';
+
+            // Add to alert log
+            const log = document.getElementById('alertLog');
+            const time = getCurrentTime();
+            log.innerHTML += `<p>${time} - System reset. All sensors back to normal operation</p>`;
+            log.scrollTop = log.scrollHeight;
+
+            this.disabled = true;
+            document.getElementById('simulateLeak').disabled = false;
+        });
+
+        // Initialize reset button as disabled
+        document.getElementById('resetLeak').disabled = true;
+
+        // SMS Alert function
+        function sendSMSAlert() {
+            alert("📱 SMS Sent to Utility Manager:\n'ALERT: Major leak detected at North Gaza Pump Station. Pressure: 1.2 bar, Flow: 210 L/s. Dispatch team immediately.'");
+            
+            // Add to log
+            const log = document.getElementById('alertLog');
+            const time = getCurrentTime();
+            log.innerHTML += `<p>${time} - SMS Alert sent to operations manager</p>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Generate Report function
+        function generateReport() {
+            alert("📊 Daily Report Generated:\n• 1 leak detected and resolved\n• 15,400 liters saved\n• Average response time: 2.3 hours\n• System uptime: 100%\n\nReport saved and ready for funder review.");
+            
+            // Add to log
+            const log = document.getElementById('alertLog');
+            const time = getCurrentTime();
+            log.innerHTML += `<p>${time} - Daily performance report generated for funder review</p>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Auto-update time every minute
+        setInterval(() => {
+            monitoringPoints.forEach((point, i) => {
+                if (point.status === "normal") {
+                    // Simulate small random variations
+                    point.pressure += (Math.random() - 0.5) * 0.1;
+                    point.flow += (Math.random() - 0.5) * 5;
+                    
+                    // Keep within reasonable bounds
+                    point.pressure = Math.max(3.0, Math.min(4.5, point.pressure));
+                    point.flow = Math.max(80, Math.min(130, point.flow));
+                    
+                    // Update popup
+                    markers[i].setPopupContent(`
+                        <div class="point-info">
+                            <h3>${point.name}</h3>
+                            <p><strong>Status:</strong> NORMAL</p>
+                            <p><strong>Pressure:</strong> ${point.pressure.toFixed(1)} bar</p>
+                            <p><strong>Flow Rate:</strong> ${point.flow.toFixed(0)} L/s</p>
+                            <p><strong>Last Update:</strong> ${getCurrentTime()}</p>
+                        </div>
+                    `);
+                }
+            });
+        }, 60000); // Update every minute
+    </script>
+</body>
+</html>
